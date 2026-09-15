@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: paygate
+          POSTGRES_PASSWORD: paygate
+          POSTGRES_DB: paygate_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U paygate"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Lint (eslint)
+        run: npm run lint
+      - name: Format check (prettier)
+        run: npm run format:check
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Tests (unit + integration with fake upstreams)
+        env:
+          TEST_DATABASE_URL: postgresql://paygate:paygate@localhost:5432/paygate_test
+          REDIS_URL: redis://localhost:6379
+        run: npm test
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose build

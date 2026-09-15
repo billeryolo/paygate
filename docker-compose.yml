@@ -1,0 +1,59 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: paygate
+      POSTGRES_PASSWORD: paygate
+      POSTGRES_DB: paygate
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U paygate']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ports:
+      - '5432:5432'
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://paygate:paygate@db:5432/paygate
+      REDIS_URL: redis://redis:6379
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-fake}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_local_dev_secret}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - '3000:3000'
+
+  # Forwards real Stripe test-mode events to the API. Requires STRIPE_API_KEY (sk_test_…)
+  # in your shell; prints the whsec_… signing secret on start — put it in STRIPE_WEBHOOK_SECRET.
+  stripe-cli:
+    image: stripe/stripe-cli:latest
+    profiles: ['stripe']
+    command: listen --api-key ${STRIPE_API_KEY} --forward-to api:3000/webhooks/stripe
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
