@@ -49,6 +49,13 @@ curl -s localhost:3000/ask -H "authorization: Bearer $KEY" -H 'content-type: app
 curl -s localhost:3000/me -H "authorization: Bearer $KEY"      # balance + ledger
 ```
 
+## Live on Railway
+
+**https://paygate-production-ee1e.up.railway.app** — [`/health`](https://paygate-production-ee1e.up.railway.app/health) · [`/packs`](https://paygate-production-ee1e.up.railway.app/packs).
+Runs with the fake Stripe gateway (no real keys) on Railway managed Postgres/Redis; the
+"Try it" flow above works against it (checkout returns a fake session URL; the webhook
+endpoint verifies real Stripe signatures against `STRIPE_WEBHOOK_SECRET`).
+
 ---
 
 ## Architecture
